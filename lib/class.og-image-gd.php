@@ -186,7 +186,7 @@ class GD
 		if (false !== $background_color) {
 			if ('inline' === $textOptions['display']) {
 				//  /.75 points to pixels
-				imagefilledrectangle($this->resource, $text_posX - $p, $text_posY - $p, $text_posX + $text_width + $p, $text_posY + ($text_height / .75) + $p, $background_color);
+				imagefilledrectangle($this->resource, (int) $text_posX - $p, (int) $text_posY - $p, (int) $text_posX + $text_width + $p, (int) $text_posY + ($text_height / .75) + $p, $background_color);
 			}
 		}
 		// NOTE: imagettf uses Y position for bottom!! of the text, not the top
@@ -319,7 +319,7 @@ class GD
 			$logo_posY = $logoOptions['top'] + $p;
 		}
 
-		imagecopyresampled($this->resource, $logo, $logo_posX, $logo_posY, 0, 0, $w, $h, $logo_width, $logo_height);
+		imagecopyresampled($this->resource, $logo, (int) $logo_posX, (int) $logo_posY, 0, 0, (int) $w, (int) $h, (int) $logo_width, (int) $logo_height);
 		imagedestroy($logo);
 
 		do_action_ref_array('bsi_image_gd', [&$this->resource, 'after_adding_logo', $this->handler->post_id, $this->handler->image_id]);
@@ -328,17 +328,29 @@ class GD
 	public function save($format, $quality)
 	{
 		$this->manager->file_put_contents($this->target, ''); // prime the file, creating all directories
-		switch($format) {
+		$scaled = imagescale( $this->resource, $this->manager->width, $this->manager->height, IMG_BICUBIC_FIXED );
+		header( 'X-OG-Scaler: imagescale' );
+		if ( false === $scaled ) {
+			header( 'X-OG-Scaler: imagecopyresized', true );
+			$scaled = imagecreatetruecolor( $this->manager->width, $this->manager->height );
+			imagecopyresized( $scaled, $this->resource, 0, 0, 0, 0, $this->manager->width, $this->manager->height, imagesx( $this->resource ), imagesy( $this->resource ) );
+		}
+		if ( false === $scaled ) {
+			header( 'X-OG-Scaler: none', true );
+			$scaled = &$this->resource;
+		}
+
+		switch ( $format ) {
 			case 'jpg':
-				imagejpeg(imagescale($this->resource, $this->manager->width, $this->manager->height, IMG_BICUBIC_FIXED), $this->target, $quality);
-			break;
+				imagejpeg( $scaled, $this->target, $quality );
+				break;
 			case 'webp':
-				imagewebp(imagescale($this->resource, $this->manager->width, $this->manager->height, IMG_BICUBIC_FIXED), $this->target, $quality);
-			break;
+				imagewebp( $scaled, $this->target, $quality );
+				break;
 			case 'png':
 			default:
-				imagepng(imagescale($this->resource, $this->manager->width, $this->manager->height, IMG_BICUBIC_FIXED), $this->target, $quality);
-			break;
+				imagepng( $scaled, $this->target, $quality );
+				break;
 		}
 	}
 
